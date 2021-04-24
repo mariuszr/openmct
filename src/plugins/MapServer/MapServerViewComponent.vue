@@ -93,7 +93,7 @@
     >
         <iframe
             :src="domainObject.url"
-            :name="domainObject.id"
+            :name="key"
         ></iframe>
     </div>
 </div>
@@ -129,6 +129,9 @@ export default {
         };
     },
     computed: {
+        key() {
+            return this.openmct.objects.makeKeyString(this.domainObject.identifier);
+        },
         hasLastPoint() {
             return this.lastPoint.layerName !== undefined
                 && this.lastPoint.lon !== undefined
@@ -139,7 +142,7 @@ export default {
         window.removeEventListener('message', this.handleMessage);
     },
     mounted() {
-        this.mmgis = window.frames[this.domainObject.id];
+        this.mmgis = window.frames[this.key];
 
         window.addEventListener('message', this.setLastPoint);
     },
