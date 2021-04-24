@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Open MCT, Copyright (c) 2014-2020, United States Government
+ * Open MCT, Copyright (c) 2014-2021, United States Government
  * as represented by the Administrator of the National Aeronautics and Space
  * Administration. All rights reserved.
  *
@@ -22,6 +22,7 @@
 
 import { createOpenMct, resetApplicationState } from "utils/testing";
 import ConditionPlugin from "./plugin";
+import stylesManager from '@/ui/inspector/styles/StylesManager';
 import StylesView from "./components/inspector/StylesView.vue";
 import Vue from 'vue';
 import {getApplicableStylesForItem} from "./utils/styleUtils";
@@ -135,7 +136,7 @@ describe('the plugin', function () {
                 }
             };
 
-            const applicableViews = openmct.objectViews.get(testViewObject);
+            const applicableViews = openmct.objectViews.get(testViewObject, []);
             let conditionSetView = applicableViews.find((viewProvider) => viewProvider.key === 'conditionSet.view');
             expect(conditionSetView).toBeDefined();
         });
@@ -400,13 +401,14 @@ describe('the plugin', function () {
             let viewContainer = document.createElement('div');
             child.append(viewContainer);
             component = new Vue({
-                provide: {
-                    openmct: openmct,
-                    selection: selection
-                },
                 el: viewContainer,
                 components: {
                     StylesView
+                },
+                provide: {
+                    openmct: openmct,
+                    selection: selection,
+                    stylesManager
                 },
                 template: '<styles-view/>'
             });
@@ -541,7 +543,6 @@ describe('the plugin', function () {
         });
 
         it('should evaluate as stale when telemetry is not received in the allotted time', (done) => {
-
             let conditionMgr = new ConditionManager(conditionSetDomainObject, openmct);
             conditionMgr.on('conditionSetResultUpdated', mockListener);
             conditionMgr.telemetryObjects = {
@@ -563,7 +564,7 @@ describe('the plugin', function () {
         });
 
         it('should not evaluate as stale when telemetry is received in the allotted time', (done) => {
-            const date = Date.now();
+            const date = 1;
             conditionSetDomainObject.configuration.conditionCollection[0].configuration.criteria[0].input = ["0.4"];
             let conditionMgr = new ConditionManager(conditionSetDomainObject, openmct);
             conditionMgr.on('conditionSetResultUpdated', mockListener);

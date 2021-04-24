@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Open MCT, Copyright (c) 2014-2020, United States Government
+ * Open MCT, Copyright (c) 2014-2021, United States Government
  * as represented by the Administrator of the National Aeronautics and Space
  * Administration. All rights reserved.
  *
@@ -180,7 +180,6 @@ define([
         processHistoricalData(telemetryData, columnMap, keyString, limitEvaluator) {
             let telemetryRows = telemetryData.map(datum => new TelemetryTableRow(datum, columnMap, keyString, limitEvaluator));
             this.boundedRows.add(telemetryRows);
-            this.emit('historical-rows-processed');
         }
 
         /**
@@ -223,11 +222,15 @@ define([
         getColumnMapForObject(objectKeyString) {
             let columns = this.configuration.getColumns();
 
-            return columns[objectKeyString].reduce((map, column) => {
-                map[column.getKey()] = column;
+            if (columns[objectKeyString]) {
+                return columns[objectKeyString].reduce((map, column) => {
+                    map[column.getKey()] = column;
 
-                return map;
-            }, {});
+                    return map;
+                }, {});
+            }
+
+            return {};
         }
 
         addColumnsForObject(telemetryObject) {

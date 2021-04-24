@@ -10,11 +10,11 @@ import {STYLE_CONSTANTS} from "@/plugins/condition/utils/constants";
 export default {
     inject: ["openmct"],
     props: {
-        object: {
+        showEditView: Boolean,
+        defaultObject: {
             type: Object,
             default: undefined
         },
-        showEditView: Boolean,
         objectPath: {
             type: Array,
             default: () => {
@@ -28,16 +28,20 @@ export default {
         layoutFont: {
             type: String,
             default: ''
+        },
+        objectViewKey: {
+            type: String,
+            default: ''
         }
     },
     data() {
         return {
-            currentObject: this.object
+            domainObject: this.defaultObject
         };
     },
     computed: {
         objectFontStyle() {
-            return this.currentObject && this.currentObject.configuration && this.currentObject.configuration.fontStyle;
+            return this.domainObject && this.domainObject.configuration && this.domainObject.configuration.fontStyle;
         },
         fontSize() {
             return this.objectFontStyle ? this.objectFontStyle.fontSize : this.layoutFontSize;
@@ -46,20 +50,10 @@ export default {
             return this.objectFontStyle ? this.objectFontStyle.font : this.layoutFont;
         }
     },
-    watch: {
-        object(newObject, oldObject) {
-            this.currentObject = newObject;
-            this.debounceUpdateView();
-        }
-    },
     destroyed() {
         this.clear();
         if (this.releaseEditModeHandler) {
             this.releaseEditModeHandler();
-        }
-
-        if (this.unlisten) {
-            this.unlisten();
         }
 
         if (this.stopListeningStyles) {
@@ -74,6 +68,11 @@ export default {
             this.styleRuleManager.destroy();
             delete this.styleRuleManager;
         }
+
+        if (this.actionCollection) {
+            this.actionCollection.destroy();
+            delete this.actionCollection;
+        }
     },
     created() {
         this.debounceUpdateView = _.debounce(this.updateView, 10);
@@ -87,7 +86,7 @@ export default {
             capture: true
         });
         this.$el.addEventListener('drop', this.addObjectToParent);
-        if (this.currentObject) {
+        if (this.domainObject) {
             //This is to apply styles to subobjects in a layout
             this.initObjectStyles();
         }
@@ -130,7 +129,7 @@ export default {
         invokeEditModeHandler(editMode) {
             let edit;
 
-            if (this.currentObject.locked) {
+            if (this.domainObject.locked) {
                 edit = false;
             } else {
                 edit = editMode;
@@ -149,6 +148,7 @@ export default {
 
             let keys = Object.keys(styleObj);
             let elemToStyle = this.getStyleReceiver();
+
             keys.forEach(key => {
                 if (elemToStyle) {
                     if ((typeof styleObj[key] === 'string') && (styleObj[key].indexOf('__no_value') > -1)) {
@@ -169,13 +169,13 @@ export default {
         },
         updateView(immediatelySelect) {
             this.clear();
-            if (!this.currentObject) {
+            if (!this.domainObject) {
                 return;
             }
 
-            this.composition = this.openmct.composition.get(this.currentObject);
+            this.composition = this.openmct.composition.get(this.domainObject);
+
             if (this.composition) {
-                this.composition._synchronize();
                 this.loadComposition();
             }
 
@@ -191,15 +191,15 @@ export default {
 
             if (provider.edit && this.showEditView) {
                 if (this.openmct.editor.isEditing()) {
-                    this.currentView = provider.edit(this.currentObject, true, objectPath);
+                    this.currentView = provider.edit(this.domainObject, true, objectPath);
                 } else {
-                    this.currentView = provider.view(this.currentObject, objectPath);
+                    this.currentView = provider.view(this.domainObject, objectPath);
                 }
 
                 this.openmct.editor.on('isEditing', this.toggleEditView);
                 this.releaseEditModeHandler = () => this.openmct.editor.off('isEditing', this.toggleEditView);
             } else {
-                this.currentView = provider.view(this.currentObject, objectPath);
+                this.currentView = provider.view(this.domainObject, objectPath);
 
                 if (this.currentView.onEditModeChange) {
                     this.openmct.editor.on('isEditing', this.invokeEditModeHandler);
@@ -207,6 +207,7 @@ export default {
                 }
             }
 
+            this.getActionCollection();
             this.currentView.show(this.viewContainer, this.openmct.editor.isEditing());
 
             if (immediatelySelect) {
@@ -215,6 +216,14 @@ export default {
             }
 
             this.openmct.objectViews.on('clearData', this.clearData);
+        },
+        getActionCollection() {
+            if (this.actionCollection) {
+                this.actionCollection.destroy();
+            }
+
+            this.actionCollection = this.openmct.actions._get(this.currentObjectPath || this.objectPath, this.currentView);
+            this.$emit('change-action-collection', this.actionCollection);
         },
         show(object, viewKey, immediatelySelect, currentObjectPath) {
             this.updateStyle();
@@ -232,15 +241,11 @@ export default {
                 this.composition._destroy();
             }
 
-            this.currentObject = object;
+            this.domainObject = object;
 
             if (currentObjectPath) {
                 this.currentObjectPath = currentObjectPath;
             }
-
-            this.unlisten = this.openmct.objects.observe(this.currentObject, '*', (mutatedObject) => {
-                this.currentObject = mutatedObject;
-            });
 
             this.viewKey = viewKey;
 
@@ -250,16 +255,16 @@ export default {
         },
         initObjectStyles() {
             if (!this.styleRuleManager) {
-                this.styleRuleManager = new StyleRuleManager((this.currentObject.configuration && this.currentObject.configuration.objectStyles), this.openmct, this.updateStyle.bind(this), true);
+                this.styleRuleManager = new StyleRuleManager((this.domainObject.configuration && this.domainObject.configuration.objectStyles), this.openmct, this.updateStyle.bind(this), true);
             } else {
-                this.styleRuleManager.updateObjectStyleConfig(this.currentObject.configuration && this.currentObject.configuration.objectStyles);
+                this.styleRuleManager.updateObjectStyleConfig(this.domainObject.configuration && this.domainObject.configuration.objectStyles);
             }
 
             if (this.stopListeningStyles) {
                 this.stopListeningStyles();
             }
 
-            this.stopListeningStyles = this.openmct.objects.observe(this.currentObject, 'configuration.objectStyles', (newObjectStyle) => {
+            this.stopListeningStyles = this.openmct.objects.observe(this.domainObject, 'configuration.objectStyles', (newObjectStyle) => {
                 //Updating styles in the inspector view will trigger this so that the changes are reflected immediately
                 this.styleRuleManager.updateObjectStyleConfig(newObjectStyle);
             });
@@ -267,7 +272,7 @@ export default {
             this.setFontSize(this.fontSize);
             this.setFont(this.font);
 
-            this.stopListeningFontStyles = this.openmct.objects.observe(this.currentObject, 'configuration.fontStyle', (newFontStyle) => {
+            this.stopListeningFontStyles = this.openmct.objects.observe(this.domainObject, 'configuration.fontStyle', (newFontStyle) => {
                 this.setFontSize(newFontStyle.fontSize);
                 this.setFont(newFontStyle.font);
             });
@@ -279,7 +284,7 @@ export default {
             if (this.currentView && this.currentView.getSelectionContext) {
                 return this.currentView.getSelectionContext();
             } else {
-                return { item: this.currentObject };
+                return { item: this.domainObject };
             }
         },
         onDragOver(event) {
@@ -302,11 +307,21 @@ export default {
                 event.stopPropagation();
             }
         },
+        getViewKey() {
+            let viewKey = this.viewKey;
+            if (this.objectViewKey) {
+                viewKey = this.objectViewKey;
+            }
+
+            return viewKey;
+        },
         getViewProvider() {
-            let provider = this.openmct.objectViews.getByProviderKey(this.viewKey);
+
+            let provider = this.openmct.objectViews.getByProviderKey(this.getViewKey());
 
             if (!provider) {
-                provider = this.openmct.objectViews.get(this.currentObject)[0];
+                let objectPath = this.currentObjectPath || this.objectPath;
+                provider = this.openmct.objectViews.get(this.domainObject, objectPath)[0];
                 if (!provider) {
                     return;
                 }
@@ -315,10 +330,11 @@ export default {
             return provider;
         },
         editIfEditable(event) {
+            let objectPath = this.currentObjectPath || this.objectPath;
             let provider = this.getViewProvider();
             if (provider
                 && provider.canEdit
-                && provider.canEdit(this.currentObject)
+                && provider.canEdit(this.domainObject, objectPath)
                 && this.isEditingAllowed()
                 && !this.openmct.editor.isEditing()) {
                 this.openmct.editor.edit();
@@ -335,7 +351,7 @@ export default {
         clearData(domainObject) {
             if (domainObject) {
                 let clearKeyString = this.openmct.objects.makeKeyString(domainObject.identifier);
-                let currentObjectKeyString = this.openmct.objects.makeKeyString(this.currentObject.identifier);
+                let currentObjectKeyString = this.openmct.objects.makeKeyString(this.domainObject.identifier);
 
                 if (clearKeyString === currentObjectKeyString) {
                     if (this.currentView.onClearData) {
@@ -349,11 +365,11 @@ export default {
             }
         },
         isEditingAllowed() {
-            let browseObject = this.openmct.layout.$refs.browseObject.currentObject;
+            let browseObject = this.openmct.layout.$refs.browseObject.domainObject;
             let objectPath = this.currentObjectPath || this.objectPath;
             let parentObject = objectPath[1];
 
-            return [browseObject, parentObject, this.currentObject].every(object => object && !object.locked);
+            return [browseObject, parentObject, this.domainObject].every(object => object && !object.locked);
         },
         setFontSize(newSize) {
             let elemToStyle = this.getStyleReceiver();

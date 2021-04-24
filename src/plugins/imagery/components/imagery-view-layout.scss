@@ -1,8 +1,8 @@
 .c-imagery {
     display: flex;
     flex-direction: column;
+    flex: 1 1 auto;
     overflow: hidden;
-    height: 100%;
 
     &:focus {
         outline: none;
@@ -19,14 +19,11 @@
     }
 
     &__main-image {
-        &__bg,
-        &__image {
-            height: 100%;
-        }
-
         &__bg {
             background-color: $colorPlotBg;
             border: 1px solid transparent;
+            flex: 1 1 auto;
+            height: 0;
 
             &.unnsynced{
                 @include sUnsynced();
@@ -34,9 +31,9 @@
         }
 
         &__image {
-            background-position: center;
-            background-repeat: no-repeat;
-            background-size: contain;
+            height: 100%;
+            width: 100%;
+            object-fit: contain;
         }
     }
 
@@ -74,13 +71,14 @@
     }
 
     &__age {
-        border-radius: $controlCr;
+        border-radius: $smallCr;
         display: flex;
         flex-shrink: 0;
-        align-items: baseline;
-        padding: 1px $interiorMarginSm;
+        align-items: center;
+        padding: 2px $interiorMarginSm;
 
         &:before {
+            font-size: 0.9em;
             opacity: 0.5;
             margin-right: $interiorMarginSm;
         }
@@ -89,8 +87,9 @@
     &--new {
         // New imagery
         $bgColor: $colorOk;
+        color: $colorOkFg;
         background: rgba($bgColor, 0.5);
-        @include flash($animName: flashImageAge, $dur: 250ms, $valStart: rgba($colorOk, 0.7), $valEnd: rgba($colorOk, 0));
+        @include flash($animName: flashImageAge, $iter: 2, $dur: 250ms, $valStart: rgba($colorOk, 0.7), $valEnd: rgba($colorOk, 0));
     }
 
     &__thumbs-wrapper {
